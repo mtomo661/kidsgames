@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>おんがくたい</title>
+    <!-- Tailwind CSS を読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (M PLUS Rounded 1c) を読み込み -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Tone.js (音を鳴らすライブラリ) を読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #FFFBEB; /* 明るいクリーム色 */
+            color: #4B5563;
+            overflow: hidden; /* ページ全体のスクロールバーを非表示 */
+            -webkit-tap-highlight-color: transparent; /* スマホでタップしたときの色を消す */
+        }
+        /* キーボードを囲むラッパー */
+        .keyboard-wrapper {
+            width: 100%;
+            max-width: 90vw; /* 画面幅の90%を最大幅に */
+            overflow-x: auto; /* 横方向のスクロールを有効に */
+            -webkit-overflow-scrolling: touch; /* iOSでのスムーズなスクロール */
+            background: #f87171; /* 赤系の背景 */
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2), inset 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px 10px;
+        }
+        /* キーボード全体のコンテナ */
+        .keyboard {
+            display: flex; /* 鍵盤を横に並べる */
+            position: relative; /* 黒鍵を配置する基準にする */
+            width: fit-content; /* 中身の幅に合わせる */
+        }
+        /* 鍵盤の共通スタイル */
+        .key {
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            border: 4px solid #4B5563;
+            transition: all 0.07s ease;
+            box-shadow: 0 5px 0 #9ca3af;
+        }
+        /* 白鍵のスタイル */
+        .white {
+            width: 80px; /* ★サイズを大きく */
+            height: 300px; /* ★サイズを大きく */
+            background-color: white;
+            border-radius: 0 0 12px 12px;
+            border-top: none;
+            margin: 0 3px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #a1a1aa;
+        }
+        /* 黒鍵のスタイル */
+        .black {
+            width: 50px; /* ★サイズを大きく */
+            height: 180px; /* ★サイズを大きく */
+            background-color: #4B5563;
+            position: absolute; /* 白鍵の上に配置 */
+            z-index: 2; /* 白鍵より手前に表示 */
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 3px 0 #1f2937;
+        }
+        /* 鍵盤を押したときのエフェクト */
+        .key.pressed {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        /* タイトルの影 */
+        .title-text {
+            text-shadow: 3px 3px 0px #FBBF24; /* 黄色い影 */
+        }
+    </style>
+</head>
+<body class="antialiased flex flex-col items-center justify-center h-screen p-4">
+
+    <!-- ヘッダータイトル -->
+    <header class="text-center mb-6">
+        <h1 class="text-4xl md:text-6xl font-extrabold text-lime-500 title-text">ピアノをひこう</h1>
+        <p class="mt-2 text-lg text-gray-600">すきな おとを だしてね！</p>
+    </header>
+
+    <!-- ピアノの鍵盤 -->
+    <main class="keyboard-wrapper">
+        <div class="keyboard" id="keyboard">
+            <!-- 鍵盤はJavaScriptでここに生成されます -->
+        </div>
+    </main>
+    
+    <!-- メニューに戻るボタン -->
+    <a href="index.html" class="mt-8 px-6 py-2 bg-gray-400 text-white font-bold rounded-full shadow-md hover:bg-gray-500 transition">
+        もどる
+    </a>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 音の準備 ---
+            const synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+            }).toDestination();
+
+            const keyboardContainer = document.getElementById('keyboard');
+            const notes = [];
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+            // ★3オクターブ分の音符を生成 (C3からB5まで)
+            for (let octave = 3; octave <= 5; octave++) {
+                noteNames.forEach(name => {
+                    notes.push(name + octave);
+                });
+            }
+
+            const whiteKeyWidth = 80;
+            const whiteKeyMargin = 3;
+            const blackKeyWidth = 50;
+            let whiteKeyCount = 0;
+
+            // ★JavaScriptで鍵盤を動的に生成
+            notes.forEach(note => {
+                const keyElement = document.createElement('div');
+                const isBlack = note.includes('#');
+                keyElement.dataset.note = note;
+
+                if (isBlack) {
+                    keyElement.className = 'key black';
+                    // 黒鍵の位置を計算して配置
+                    const leftPosition = (whiteKeyCount * (whiteKeyWidth + (whiteKeyMargin * 2))) - (blackKeyWidth / 2) - whiteKeyMargin;
+                    keyElement.style.left = `${leftPosition}px`;
+                } else {
+                    keyElement.className = 'key white';
+                    // 白鍵に音名を表示
+                    keyElement.textContent = note.slice(0, -1);
+                    whiteKeyCount++;
+                }
+                keyboardContainer.appendChild(keyElement);
+            });
+
+            // --- 鍵盤の処理 ---
+            const playSound = (keyElement) => {
+                if (!keyElement) return;
+
+                // ユーザー操作をきっかけにオーディオを開始
+                Tone.start();
+
+                const note = keyElement.dataset.note;
+                if (note) {
+                    // 音を鳴らす
+                    synth.triggerAttackRelease(note, '8n');
+
+                    // 見た目のアニメーション
+                    keyElement.classList.add('pressed');
+                    setTimeout(() => {
+                        keyElement.classList.remove('pressed');
+                    }, 150);
+                }
+            };
+
+            // PCのマウスとスマホのタッチの両方に対応
+            const handleInteractionStart = (e) => {
+                e.preventDefault();
+                const targetKey = e.target.closest('.key');
+                playSound(targetKey);
+            };
+
+            keyboardContainer.addEventListener('mousedown', handleInteractionStart);
+            keyboardContainer.addEventListener('touchstart', handleInteractionStart, { passive: false });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ぴょんぴょんジャンプゲーム DX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Mochiy+Pop+One', sans-serif;
+            background: linear-gradient(135deg, #89f7fe, #66a6ff);
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: #f0f9ff;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: #1e3a8a;
+            pointer-events: none;
+        }
+        #startScreen, #gameOverScreen {
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            padding: 1rem;
+        }
+        .score-container {
+             position: absolute;
+             top: 1.5rem;
+             right: 2rem;
+             display: flex;
+             align-items: center;
+             gap: 1rem;
+        }
+        .score {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            text-shadow: 2px 2px 4px rgba(255,255,255,0.7);
+        }
+        #soundButton {
+            background: #fff; border: none; border-radius: 50%;
+            width: 48px; height: 48px; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .title {
+            font-size: clamp(2.5rem, 10vw, 5rem);
+            text-shadow: 3px 3px 0 #fff, 6px 6px 0 rgba(102, 166, 255, 0.7);
+            margin-bottom: 1rem;
+        }
+        .instructions {
+            font-size: clamp(1rem, 4vw, 1.5rem);
+            margin-bottom: 1.5rem;
+        }
+        .button {
+            padding: 1rem 2.5rem;
+            font-size: clamp(1.2rem, 4vw, 1.8rem);
+            background-color: #fb7185;
+            color: white;
+            border-radius: 9999px;
+            box-shadow: 0 5px 0 #e11d48;
+            border: none;
+            cursor: pointer;
+            transition: all 0.1s ease-in-out;
+        }
+        .button:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #e11d48;
+        }
+        .button:disabled {
+            background-color: #9ca3af;
+            box-shadow: 0 5px 0 #4b5563;
+            cursor: not-allowed;
+        }
+        .mode-button {
+            transition: all 0.2s ease-in-out;
+            border: 2px solid;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: clamp(0.9rem, 3vw, 1.2rem);
+        }
+        .mode-button.selected {
+            color: white;
+        }
+        .difficulty-easy.selected { background-color: #22c55e; border-color: #16a34a; }
+        .difficulty-normal.selected { background-color: #f97316; border-color: #ea580c; }
+        .difficulty-hard.selected { background-color: #ef4444; border-color: #dc2626; }
+
+        #imagePreview {
+            width: 60px; height: 60px;
+            object-fit: cover; border-radius: 0.5rem;
+            border: 2px solid #ddd; margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div class="score-container hidden" id="gameUi">
+    <div id="scoreDisplay" class="score">スコア: 0</div>
+    <button id="soundButton"></button>
+</div>
+
+<div id="startScreen" class="ui-overlay">
+    <h1 class="title">ぴょんぴょんジャンプ DX</h1>
+    <p class="instructions">クリックかタップでジャンプ！</p>
+    
+    <div class="mb-4">
+        <p class="mb-2 font-bold">むずかしさ</p>
+        <div class="flex justify-center gap-2">
+            <button id="difficulty-easy" class="mode-button difficulty-easy selected">かんたん</button>
+            <button id="difficulty-normal" class="mode-button difficulty-normal">ふつう</button>
+            <button id="difficulty-hard" class="mode-button difficulty-hard">むずかしい</button>
+        </div>
+    </div>
+    
+    <div class="mb-4">
+        <p class="mb-2 font-bold">キャラクター</p>
+        <div class="flex justify-center gap-2">
+            <button id="modeRabbitButton" class="mode-button border-blue-500 selected">うさぎ</button>
+            <button id="modeImageButton" class="mode-button border-blue-500">すきな画像</button>
+        </div>
+    </div>
+
+    <div id="imageUploadSection" class="hidden mb-2 text-center">
+        <input type="file" id="imageUpload" accept="image/*" class="text-sm">
+        <img id="imagePreview" class="hidden mx-auto">
+    </div>
+
+    <button id="startButton" class="button">スタート！</button>
+</div>
+
+<div id="gameOverScreen" class="ui-overlay hidden">
+    <h1 class="title" style="font-size: clamp(2rem, 8vw, 3.5rem);">ゲームオーバー</h1>
+    <p id="finalScore" class="instructions" style="font-size: clamp(1.2rem, 5vw, 2rem);"></p>
+    <button id="retryButton" class="button">もういちど</button>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI要素
+    const startScreen = document.getElementById('startScreen');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const gameUi = document.getElementById('gameUi');
+    const scoreDisplay = document.getElementById('scoreDisplay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const startButton = document.getElementById('startButton');
+    const retryButton = document.getElementById('retryButton');
+    const modeRabbitButton = document.getElementById('modeRabbitButton');
+    const modeImageButton = document.getElementById('modeImageButton');
+    const imageUploadSection = document.getElementById('imageUploadSection');
+    const imageUploadInput = document.getElementById('imageUpload');
+    const imagePreview = document.getElementById('imagePreview');
+    const soundButton = document.getElementById('soundButton');
+    const difficultyButtons = {
+        easy: document.getElementById('difficulty-easy'),
+        normal: document.getElementById('difficulty-normal'),
+        hard: document.getElementById('difficulty-hard')
+    };
+
+    // ゲームの状態
+    let scale;
+    let gameState = 'start';
+    let score = 0;
+    let frameCount = 0;
+    let difficulty = 'easy';
+
+    const player = {
+        x: 0, y: 0, width: 0, height: 0,
+        velocityY: 0, isJumping: false,
+        type: 'emoji', emoji: '🐰', image: new Image()
+    };
+
+    // ゲーム設定
+    const gravity = 0.6;
+    const jumpPower = -12;
+    const groundHeight = 50;
+    let gameSpeed = 5;
+    let initialGameSpeed = 5;
+    let obstacleFrequency = 120;
+
+    const obstacles = [];
+    const obstacleEmojis = ['🌵', '🌲', '🌳'];
+
+    // --- サウンド関連 ---
+    let isMuted = true;
+    let isAudioReady = false;
+    const speakerOnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+    const speakerOffIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
+    
+    const jumpSound = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.1 } }).toDestination();
+    const gameOverSound = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'square' } }).toDestination();
+
+    // ★修正点: BGMの音源をより安定したシンプルなシンセサイザーに変更
+    const bgmSynth = new Tone.Synth({
+        oscillator: { type: "pulse", width: 0.4 },
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.5 }
+    }).toDestination();
+    // 音に厚みを加えるエフェクト
+    const chorus = new Tone.Chorus(4, 2.5, 0.7).toDestination().start();
+    bgmSynth.connect(chorus);
+
+    // BGMのメロディーとループを定義
+    const bgmNotes = ["A3", "G3", "E3", "D3", "E3", "G3", "A3", "C4"];
+    let noteIndex = 0;
+    const bgmLoop = new Tone.Loop(time => {
+        const note = bgmNotes[noteIndex % bgmNotes.length];
+        if (note) {
+            bgmSynth.triggerAttackRelease(note, "8n", time);
+        }
+        noteIndex++;
+    }, "8n");
+    Tone.Transport.bpm.value = 140;
+
+    // --- 関数 ---
+    function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = window.innerWidth * dpr;
+        canvas.height = window.innerHeight * dpr;
+        scale = canvas.height / 540;
+        player.width = 50 * scale;
+        player.height = 50 * scale;
+        player.x = 80 * scale;
+        player.y = canvas.height - groundHeight * scale - player.height;
+        ctx.font = `${40 * scale}px 'Mochiy Pop One'`;
+    }
+
+    function jump() {
+        if (gameState === 'playing' && !player.isJumping) {
+            if (!isMuted) jumpSound.triggerAttackRelease("C5", "32n");
+            player.velocityY = jumpPower * scale;
+            player.isJumping = true;
+        }
+    }
+
+    function generateObstacle() {
+        const size = (Math.random() * 30 + 40) * scale;
+        const emoji = obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
+        obstacles.push({ x: canvas.width, y: canvas.height - groundHeight * scale - size, width: size, height: size, emoji: emoji });
+    }
+
+    function update() {
+        if (gameState !== 'playing') return;
+        frameCount++;
+        player.velocityY += gravity * scale;
+        player.y += player.velocityY;
+        if (player.y > canvas.height - groundHeight * scale - player.height) {
+            player.y = canvas.height - groundHeight * scale - player.height;
+            player.velocityY = 0;
+            player.isJumping = false;
+        }
+        obstacles.forEach(obs => { obs.x -= gameSpeed * scale; });
+        if (obstacles.length > 0 && obstacles[0].x < -obstacles[0].width) {
+            obstacles.shift();
+            score++;
+            scoreDisplay.textContent = `スコア: ${score}`;
+            if (score > 0 && score % 10 === 0) { gameSpeed += 0.5; }
+        }
+        if (frameCount % Math.max(40, Math.floor(obstacleFrequency - gameSpeed * 4)) === 0) {
+            generateObstacle();
+        }
+        obstacles.forEach(obs => {
+            if (player.x < obs.x + obs.width * 0.8 && player.x + player.width * 0.8 > obs.x &&
+                player.y < obs.y + obs.height * 0.8 && player.y + player.height * 0.8 > obs.y) {
+                gameOver();
+            }
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#654321';
+        ctx.fillRect(0, canvas.height - groundHeight * scale, canvas.width, groundHeight * scale);
+        ctx.fillStyle = '#8dc351';
+        ctx.fillRect(0, canvas.height - groundHeight * scale, canvas.width, 10 * scale);
+        if (player.type === 'image' && player.image.complete) {
+            ctx.drawImage(player.image, player.x, player.y, player.width, player.height);
+        } else {
+            ctx.font = `${player.width}px sans-serif`;
+            ctx.fillText(player.emoji, player.x, player.y + player.height);
+        }
+        obstacles.forEach(obs => {
+            ctx.font = `${obs.width}px sans-serif`;
+            ctx.fillText(obs.emoji, obs.x, obs.y + obs.height);
+        });
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+    
+    async function startGame() {
+        if (!isAudioReady) {
+            await Tone.start();
+            isAudioReady = true;
+            Tone.Destination.mute = isMuted;
+            console.log("オーディオの準備ができました。");
+        }
+
+        gameState = 'playing';
+        score = 0;
+        frameCount = 0;
+        
+        switch(difficulty) {
+            case 'easy': initialGameSpeed = 5; obstacleFrequency = 120; break;
+            case 'normal': initialGameSpeed = 7; obstacleFrequency = 100; break;
+            case 'hard': initialGameSpeed = 9; obstacleFrequency = 80; break;
+        }
+        gameSpeed = initialGameSpeed;
+        console.log(`ゲーム開始！ 難易度: ${difficulty}, 初期スピード: ${gameSpeed}`);
+
+        obstacles.length = 0;
+        player.y = canvas.height - groundHeight * scale - player.height;
+        player.velocityY = 0;
+        scoreDisplay.textContent = `スコア: 0`;
+        startScreen.classList.add('hidden');
+        gameOverScreen.classList.add('hidden');
+        gameUi.classList.remove('hidden');
+
+        // BGMを開始
+        bgmLoop.start(0);
+        Tone.Transport.start();
+        console.log("BGMを開始しました。");
+    }
+    
+    function gameOver() {
+        gameState = 'gameOver';
+        console.log(`ゲームオーバー！ 最終スコア: ${score}`);
+        if (!isMuted) {
+            gameOverSound.triggerAttackRelease(["C4", "G3", "E3", "C3"], "4n");
+        }
+        
+        bgmLoop.stop();
+        Tone.Transport.stop();
+        console.log("BGMを停止しました。");
+        
+        finalScoreEl.textContent = `最終スコア: ${score}`;
+        gameOverScreen.classList.remove('hidden');
+        gameUi.classList.add('hidden');
+    }
+
+    function setDifficulty(level) {
+        difficulty = level;
+        Object.keys(difficultyButtons).forEach(key => {
+            difficultyButtons[key].classList.toggle('selected', key === level);
+        });
+    }
+
+    function setCharacterMode(mode) {
+        if (mode === 'rabbit') {
+            player.type = 'emoji';
+            modeRabbitButton.classList.add('selected');
+            modeImageButton.classList.remove('selected');
+            imageUploadSection.classList.add('hidden');
+        } else {
+            player.type = 'image';
+            modeRabbitButton.classList.remove('selected');
+            modeImageButton.classList.add('selected');
+            imageUploadSection.classList.remove('hidden');
+        }
+        checkStartButton();
+    }
+
+    function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                player.image.src = event.target.result;
+                imagePreview.src = event.target.result;
+                imagePreview.classList.remove('hidden');
+                checkStartButton();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+    
+    function checkStartButton() {
+        startButton.disabled = (player.type === 'image' && !imageUploadInput.files[0]);
+    }
+
+    async function toggleSound() {
+        if (!isAudioReady) {
+            await Tone.start();
+            isAudioReady = true;
+            Tone.Destination.mute = isMuted;
+            console.log("オーディオの準備ができました。");
+        }
+        isMuted = !isMuted;
+        Tone.Destination.mute = isMuted;
+        soundButton.innerHTML = isMuted ? speakerOffIcon : speakerOnIcon;
+        console.log(`サウンドを切り替えました: ${isMuted ? 'ミュート' : '再生中'}`);
+    }
+
+    // イベントリスナー
+    window.addEventListener('resize', resizeCanvas);
+    startButton.addEventListener('click', startGame);
+    retryButton.addEventListener('click', () => {
+        startScreen.classList.remove('hidden');
+        gameOverScreen.classList.add('hidden');
+    });
+    window.addEventListener('mousedown', jump);
+    window.addEventListener('touchstart', jump);
+    modeRabbitButton.addEventListener('click', () => setCharacterMode('rabbit'));
+    modeImageButton.addEventListener('click', () => setCharacterMode('image'));
+    imageUploadInput.addEventListener('change', handleImageUpload);
+    soundButton.addEventListener('click', toggleSound);
+    Object.keys(difficultyButtons).forEach(key => {
+        difficultyButtons[key].addEventListener('click', () => setDifficulty(key));
+    });
+
+    // 初期化
+    resizeCanvas();
+    gameLoop();
+    checkStartButton();
+    soundButton.innerHTML = speakerOffIcon;
+
+</script>
+</body>
+</html>
