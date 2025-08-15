@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>オリジナルえあわせゲーム</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 音を鳴らすためのTone.jsライブラリを追加 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        body {
+            font-family: 'Mochiy+Pop+One', sans-serif;
+            background: linear-gradient(135deg, #a8e6cf, #dcedc1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        .main-container {
+            width: 100%;
+            max-width: 800px;
+        }
+        /* --- 設定画面のスタイル --- */
+        #setupScreen {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #374151;
+            font-size: 1.1rem;
+        }
+        .input-group input[type="number"], .input-group input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #d1d5db;
+            border-radius: 0.75rem;
+            box-sizing: border-box;
+        }
+        /* モード選択ボタンのスタイル */
+        .mode-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .mode-button.selected {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        .mode-button:not(.selected) {
+            background-color: white;
+            color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        input[type="file"]::file-selector-button {
+            margin-right: 0.5rem; border: none; background: #3b82f6;
+            padding: 0.5rem 1rem; border-radius: 0.5rem; color: white;
+            cursor: pointer; transition: background-color .2s ease-in-out;
+        }
+        input[type="file"]::file-selector-button:hover { background: #2563eb; }
+        #imagePreview {
+            display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;
+            margin-top: 1rem; min-height: 50px;
+        }
+        #imagePreview img {
+            width: 50px; height: 50px; object-fit: cover;
+            border-radius: 0.5rem; border: 2px solid #ddd;
+        }
+        /* --- ゲーム画面のスタイル --- */
+        .game-header { position: relative; width: 100%; text-align: center; }
+        #soundButton {
+            position: absolute; top: 50%; right: 0; transform: translateY(-50%);
+            background: #fff; border: none; border-radius: 50%;
+            width: 48px; height: 48px; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .game-container {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 1.5rem; width: 100%;
+        }
+        .game-board {
+            display: grid; gap: 1rem; perspective: 1000px;
+            width: 90vw; max-width: 700px; margin: 0 auto;
+        }
+        .memory-card {
+            aspect-ratio: 1 / 1; position: relative; cursor: pointer;
+            border-radius: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform-style: preserve-3d; transition: transform 0.6s;
+        }
+        .memory-card.flip { transform: rotateY(180deg); }
+        .card-face {
+            position: absolute; width: 100%; height: 100%;
+            border-radius: 1rem; display: flex; justify-content: center;
+            align-items: center; backface-visibility: hidden; overflow: hidden;
+        }
+        .card-front {
+            background-color: #ffffff; transform: rotateY(180deg);
+            background-size: cover; background-position: center;
+            background-repeat: no-repeat;
+        }
+        .card-front.emoji {
+            font-size: clamp(2rem, 12vw, 4.5rem);
+        }
+        .card-back {
+            background: linear-gradient(45deg, #ff8a8a, #ffda8a); color: white;
+            font-size: clamp(2rem, 15vw, 5rem);
+        }
+        /* --- モーダルのスタイル --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 100; opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background-color: white; padding: 2rem 3rem; border-radius: 1rem;
+            text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transform: scale(0.8); transition: transform 0.3s ease-in-out;
+        }
+        .modal-overlay.visible .modal-content { transform: scale(1); }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <!-- 設定画面 -->
+    <div id="setupScreen">
+        <h1 class="text-3xl sm:text-4xl text-slate-700 mb-6">オリジナルえあわせゲーム</h1>
+        <div class="input-group">
+            <label>ゲームモードをえらんでね:</label>
+            <div class="flex justify-center gap-4 mt-2">
+                <button id="modeAnimalButton" class="mode-button px-6 py-2 rounded-full border-2 selected">どうぶつアイコン</button>
+                <button id="modeImageButton" class="mode-button px-6 py-2 rounded-full border-2">すきな画像</button>
+            </div>
+        </div>
+        <div class="input-group">
+            <label for="pairCount">カードのペア数 (2〜10):</label>
+            <input type="number" id="pairCount" min="2" max="10" value="8" class="text-center text-lg">
+        </div>
+        <div id="imageUploadSection" class="hidden">
+            <div class="input-group">
+                <label for="imageUpload">絵柄にする画像を選んでね:</label>
+                <input type="file" id="imageUpload" accept="image/*" multiple>
+                <p id="uploadStatus" class="text-sm text-gray-500 mt-2">ペア数と同じ数の画像を選んでください。</p>
+            </div>
+            <div id="imagePreview"></div>
+        </div>
+        <button id="startGameButton" class="w-full mt-4 px-8 py-4 bg-green-500 text-white text-2xl rounded-full shadow-lg hover:bg-green-600 transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100">
+            ゲームスタート！
+        </button>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="hidden">
+        <div class="game-container">
+            <div class="game-header">
+                <h1 class="text-3xl sm:text-5xl text-center text-slate-700" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.1);">えあわせゲーム</h1>
+                <button id="soundButton"></button>
+            </div>
+            <section class="game-board" id="gameBoard"></section>
+            <button id="resetButton" class="px-8 py-3 bg-pink-500 text-white text-2xl rounded-full shadow-lg hover:bg-pink-600 transition-transform transform hover:scale-105">
+                設定にもどる
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- クリアメッセージ用モーダル -->
+<div id="clearModal" class="modal-overlay">
+    <div class="modal-content">
+        <h2 class="text-4xl text-yellow-500 mb-4">クリア！</h2>
+        <p class="text-xl text-gray-700">おめでとう！</p>
+        <button id="playAgainButton" class="mt-6 px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600">もういちど遊ぶ</button>
+    </div>
+</div>
+
+<script>
+    // DOM要素
+    const setupScreen = document.getElementById('setupScreen');
+    const gameScreen = document.getElementById('gameScreen');
+    const pairCountInput = document.getElementById('pairCount');
+    const imageUploadInput = document.getElementById('imageUpload');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const imagePreview = document.getElementById('imagePreview');
+    const startGameButton = document.getElementById('startGameButton');
+    const gameBoard = document.getElementById('gameBoard');
+    const resetButton = document.getElementById('resetButton');
+    const clearModal = document.getElementById('clearModal');
+    const playAgainButton = document.getElementById('playAgainButton');
+    const soundButton = document.getElementById('soundButton');
+    const modeAnimalButton = document.getElementById('modeAnimalButton');
+    const modeImageButton = document.getElementById('modeImageButton');
+    const imageUploadSection = document.getElementById('imageUploadSection');
+
+    // ゲームの状態変数
+    let gameMode = 'animal'; // 'animal' or 'image'
+    let uploadedImages = [];
+    const defaultEmojis = ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯'];
+    let cardSet = [];
+    let hasFlippedCard = false, lockBoard = false;
+    let firstCard, secondCard;
+    let matchedPairs = 0, totalPairs = 0;
+
+    // サウンド関連
+    let isMuted = true, isAudioReady = false;
+    const speakerOnIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+    const speakerOffIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
+    const flipSound = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.1 } }).toDestination();
+    const matchSound = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.2 } }).toDestination();
+    const noMatchSound = new Tone.Synth({ oscillator: { type: 'square' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 } }).toDestination();
+    const winSound = new Tone.PolySynth(Tone.Synth).toDestination();
+    
+    // BGMのシンセサイザーとメロディーを新しく設定
+    const bgmSynth = new Tone.Synth({
+        oscillator: { type: 'fmsquare' }, // 明るい音色に変更
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.2 }
+    }).toDestination();
+    
+    // ポップなメロディのシーケンスを作成
+    const bgmPattern = new Tone.Sequence((time, note) => {
+        bgmSynth.triggerAttackRelease(note, '8n', time);
+    }, ["C4", "E4", "G4", "A4", "G4", "E4", "C4", null], "4n"); // nullで休符を入れる
+    
+    Tone.Transport.bpm.value = 120; // テンポを少し上げる
+
+    // イベントリスナー
+    pairCountInput.addEventListener('input', checkInputs);
+    imageUploadInput.addEventListener('change', handleImageUpload);
+    startGameButton.addEventListener('click', startGame);
+    resetButton.addEventListener('click', backToSetup);
+    playAgainButton.addEventListener('click', () => { clearModal.classList.remove('visible'); createBoard(); });
+    soundButton.addEventListener('click', toggleSound);
+    modeAnimalButton.addEventListener('click', () => setGameMode('animal'));
+    modeImageButton.addEventListener('click', () => setGameMode('image'));
+
+    // --- 設定画面のロジック ---
+    function setGameMode(mode) {
+        gameMode = mode;
+        if (mode === 'animal') {
+            modeAnimalButton.classList.add('selected');
+            modeImageButton.classList.remove('selected');
+            imageUploadSection.classList.add('hidden');
+        } else {
+            modeAnimalButton.classList.remove('selected');
+            modeImageButton.classList.add('selected');
+            imageUploadSection.classList.remove('hidden');
+        }
+        checkInputs();
+    }
+
+    function handleImageUpload(e) {
+        const files = e.target.files;
+        uploadedImages = [];
+        imagePreview.innerHTML = '';
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                uploadedImages.push(event.target.result);
+                const img = document.createElement('img');
+                img.src = event.target.result;
+                imagePreview.appendChild(img);
+                checkInputs();
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    
+    function checkInputs() {
+        const requiredCount = parseInt(pairCountInput.value);
+        let isReady = false;
+
+        if (gameMode === 'animal') {
+            isReady = requiredCount >= 2 && requiredCount <= 10;
+        } else {
+            const uploadedCount = uploadedImages.length;
+            if (uploadedCount > 0) {
+                uploadStatus.textContent = `${uploadedCount} / ${requiredCount} 枚の画像を選択済み`;
+            } else {
+                uploadStatus.textContent = 'ペア数と同じ数の画像を選んでください。';
+            }
+            isReady = requiredCount >= 2 && requiredCount <= 10 && uploadedCount === requiredCount;
+        }
+        
+        startGameButton.disabled = !isReady;
+    }
+    
+    // --- ゲーム画面のロジック ---
+    function startGame() {
+        totalPairs = parseInt(pairCountInput.value);
+        if (gameMode === 'animal') {
+            const selectedEmojis = defaultEmojis.slice(0, totalPairs);
+            cardSet = [...selectedEmojis, ...selectedEmojis];
+        } else {
+            cardSet = [...uploadedImages, ...uploadedImages];
+        }
+        setupScreen.classList.add('hidden');
+        gameScreen.classList.remove('hidden');
+        createBoard();
+    }
+    
+    function backToSetup() {
+        gameScreen.classList.add('hidden');
+        setupScreen.classList.remove('hidden');
+        if(!isMuted) { bgmPattern.stop(); Tone.Transport.stop(); }
+    }
+
+    function shuffle(array) { array.sort(() => Math.random() - 0.5); }
+    function adjustBoardColumns(cardCount) {
+        let columns;
+        switch(cardCount) {
+            case 4: columns = 2; break; case 6: columns = 3; break;
+            case 8: columns = 4; break; case 10: columns = 5; break;
+            case 12: columns = 4; break; case 14: columns = 4; break;
+            case 16: columns = 4; break; case 18: columns = 6; break;
+            case 20: columns = 5; break; default: columns = 4;
+        }
+        gameBoard.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+    }
+
+    function createBoard() {
+        gameBoard.innerHTML = '';
+        matchedPairs = 0;
+        resetBoardState();
+        shuffle(cardSet);
+        adjustBoardColumns(cardSet.length);
+        cardSet.forEach(item => {
+            const card = document.createElement('div');
+            card.classList.add('memory-card');
+            card.dataset.value = item;
+            
+            const isEmoji = !item.startsWith('data:image');
+            
+            card.innerHTML = `
+                <div class="card-face card-front ${isEmoji ? 'emoji' : ''}"></div>
+                <div class="card-face card-back">？</div>
+            `;
+            
+            const cardFront = card.querySelector('.card-front');
+            if (isEmoji) {
+                cardFront.textContent = item;
+            } else {
+                cardFront.style.backgroundImage = `url(${item})`;
+            }
+            
+            card.addEventListener('click', flipCard);
+            gameBoard.appendChild(card);
+        });
+    }
+
+    function flipCard() {
+        if (lockBoard || this === firstCard || this.classList.contains('flip')) return;
+        if (!isMuted) flipSound.triggerAttackRelease("C5", "8n");
+        this.classList.add('flip');
+        if (!hasFlippedCard) {
+            hasFlippedCard = true; firstCard = this;
+        } else {
+            secondCard = this; checkForMatch();
+        }
+    }
+
+    function checkForMatch() {
+        const isMatch = firstCard.dataset.value === secondCard.dataset.value;
+        isMatch ? disableCards() : unflipCards();
+    }
+
+    function disableCards() {
+        if (!isMuted) { matchSound.triggerAttackRelease("C5", "8n"); matchSound.triggerAttackRelease("G5", "8n", "+0.1"); }
+        firstCard.removeEventListener('click', flipCard);
+        secondCard.removeEventListener('click', flipCard);
+        matchedPairs++;
+        resetBoardState();
+        if (matchedPairs === totalPairs) {
+            if (!isMuted) {
+                bgmPattern.stop(); Tone.Transport.stop();
+                winSound.triggerAttackRelease(["C4", "E4", "G4", "C5"], "4n");
+            }
+            setTimeout(() => clearModal.classList.add('visible'), 500);
+        }
+    }
+
+    function unflipCards() {
+        if (!isMuted) noMatchSound.triggerAttackRelease("A3", "8n");
+        lockBoard = true;
+        setTimeout(() => {
+            firstCard.classList.remove('flip');
+            secondCard.classList.remove('flip');
+            resetBoardState();
+        }, 1200);
+    }
+
+    function resetBoardState() {
+        [hasFlippedCard, lockBoard] = [false, false];
+        [firstCard, secondCard] = [null, null];
+    }
+
+    // --- サウンド関連の関数 ---
+    function updateSoundButton() { soundButton.innerHTML = isMuted ? speakerOffIcon : speakerOnIcon; }
+    async function toggleSound() {
+        if (!isAudioReady) { await Tone.start(); isAudioReady = true; }
+        isMuted = !isMuted;
+        updateSoundButton();
+        if (!isMuted) { Tone.Transport.start(); bgmPattern.start(0); } 
+        else { bgmPattern.stop(); Tone.Transport.stop(); }
+    }
+
+    // --- 初期化処理 ---
+    updateSoundButton();
+    checkInputs(); // 初期状態でボタンの状態をチェック
+</script>
+
+</body>
+</html>
