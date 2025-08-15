@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>キッズゲーム</title>
+    <!-- Tailwind CSS を読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (M PLUS Rounded 1c) を読み込み -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+    <!-- Tone.js (音を鳴らすライブラリ) を読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #FFFBEB; /* 明るいクリーム色 */
+            color: #4B5563; /* 少し濃いめのグレー */
+        }
+        .game-card {
+            /* カードのスタイル */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            cursor: pointer;
+            border: 4px solid #fff;
+        }
+        .game-card:hover {
+            /* カードにマウスを乗せた時の動き */
+            transform: scale(1.05) rotate(-2deg);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .title-text {
+            /* タイトルの影 */
+            text-shadow: 3px 3px 0px #FBBF24; /* 黄色い影 */
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- 背景の飾り -->
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div class="absolute text-6xl opacity-10 -left-8 top-10 transform -rotate-12">⭐️</div>
+        <div class="absolute text-8xl opacity-10 right-4 top-1/4 transform rotate-12">🚗</div>
+        <div class="absolute text-7xl opacity-10 left-1/4 bottom-10 transform rotate-6">🍎</div>
+        <div class="absolute text-5xl opacity-10 right-1/3 bottom-1/3 transform -rotate-6">🎵</div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 md:py-12">
+        <!-- ヘッダータイトル -->
+        <header class="text-center mb-10 md:mb-16">
+            <h1 class="text-5xl md:text-7xl font-extrabold text-amber-500 title-text">きっずげーむ</h1>
+            <p class="mt-4 text-lg text-gray-600">すきな げーむを えらんでね！</p>
+        </header>
+
+        <!-- ゲーム選択グリッド -->
+        <main>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
+                
+                <!-- ゲームカード 1: どうぶつパズル -->
+                <a href="#" class="game-card bg-sky-300 rounded-2xl shadow-lg" data-sound="C4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🦁</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">どうぶつパズル</h2>
+                    </div>
+                </a>
+
+                <!-- ゲームカード 2: おえかき -->
+                <a href="#" class="game-card bg-pink-400 rounded-2xl shadow-lg" data-sound="D4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🎨</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">おえかきしよう</h2>
+                    </div>
+                </a>
+
+                <!-- ゲームカード 3: かず -->
+                <a href="#" class="game-card bg-teal-400 rounded-2xl shadow-lg" data-sound="E4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🔢</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">かずをかぞえよう</h2>
+                    </div>
+                </a>
+
+                <!-- ゲームカード 4: いろあて -->
+                <a href="#" class="game-card bg-purple-400 rounded-2xl shadow-lg" data-sound="F4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🔴🔵🟡</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">いろあてゲーム</h2>
+                    </div>
+                </a>
+
+                <!-- ゲームカード 5: くるま -->
+                <a href="#" class="game-card bg-orange-400 rounded-2xl shadow-lg" data-sound="G4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🚓</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">くるまをうごかそう</h2>
+                    </div>
+                </a>
+
+                <!-- ゲームカード 6: おんがく -->
+                <a href="#" class="game-card bg-lime-500 rounded-2xl shadow-lg" data-sound="A4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🎹</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">おんがくたい</h2>
+                    </div>
+                </a>
+                
+                <!-- ゲームカード 7: たべもの -->
+                <a href="#" class="game-card bg-red-400 rounded-2xl shadow-lg" data-sound="B4">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">🍰</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">たべものなあに？</h2>
+                    </div>
+                </a>
+
+                <!-- ゲームカード 8: きせかえ -->
+                <a href="#" class="game-card bg-cyan-400 rounded-2xl shadow-lg" data-sound="C5">
+                    <div class="p-6 flex flex-col items-center justify-center h-full">
+                        <div class="text-6xl md:text-8xl mb-4">👕</div>
+                        <h2 class="text-xl md:text-2xl font-bold text-white text-center">おしゃれきせかえ</h2>
+                    </div>
+                </a>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ページが読み込まれたら実行
+        document.addEventListener('DOMContentLoaded', () => {
+            // 音を鳴らすための準備
+            const synth = new Tone.Synth().toDestination();
+            
+            // すべてのゲームカードを取得
+            const gameCards = document.querySelectorAll('.game-card');
+
+            // 各カードにクリックイベントを設定
+            gameCards.forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // リンク先に移動するのを一旦止める
+                    e.preventDefault(); 
+                    
+                    // カードに設定された音を取得
+                    const sound = card.dataset.sound;
+                    
+                    // 音を鳴らす
+                    if (sound) {
+                        synth.triggerAttackRelease(sound, "8n");
+                    }
+
+                    // 少し待ってから、本来のリンク先に移動する（今はダミーなので何もしない）
+                    // setTimeout(() => {
+                    //     window.location.href = card.href;
+                    // }, 200);
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
