@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>もっと！うごく！おえかき動物の塗り絵</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Mochiy+Pop+One', sans-serif;
+        }
+        .color-box {
+            transition: transform 0.2s ease-in-out;
+        }
+        .color-box:hover {
+            transform: scale(1.1);
+        }
+        .color-box.selected {
+            border-color: #0ea5e9; /* sky-500 */
+            transform: scale(1.15);
+            box-shadow: 0 0 15px rgba(14, 165, 233, 0.5);
+        }
+        .animal-button.selected {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+        }
+        /* --- 描画エリアのスタイル --- */
+        #canvas-wrapper {
+            position: relative;
+            cursor: crosshair;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #animal-container {
+            position: absolute;
+            will-change: transform;
+            /* カスタム画像用のスタイル */
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        #drawing-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #svg-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        #svg-container svg {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body class="bg-sky-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-4 md:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-sky-600">もっと！うごく！おえかき どうぶつ ぬりえ</h1>
+            <p class="text-gray-500 mt-2">好きな動物や自分の絵に色を塗って動かしてみよう！</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- コントロールパネル -->
+            <aside class="w-full lg:w-1/4 flex flex-col gap-6">
+                <div>
+                    <h2 class="text-xl font-bold mb-3 text-sky-700">1. どうぶつをえらぶ</h2>
+                    <div id="animal-selector" class="grid grid-cols-2 gap-3"></div>
+                </div>
+                 <div>
+                    <h2 class="text-xl font-bold mb-3 text-fuchsia-700">2. じぶんの え でぬる</h2>
+                    <label for="image-upload" class="cursor-pointer w-full inline-block bg-fuchsia-500 hover:bg-fuchsia-600 text-white font-bold py-2 px-4 rounded-lg shadow transition text-center">
+                        がぞうを アップロード
+                    </label>
+                    <input type="file" id="image-upload" class="hidden" accept="image/*">
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold mb-3 text-sky-700">3. いろをえらぶ</h2>
+                    <div id="color-palette" class="grid grid-cols-5 gap-3"></div>
+                </div>
+                 <div>
+                    <h2 class="text-xl font-bold mb-3 text-sky-700">4. ふでのふとさ</h2>
+                    <div class="flex flex-col items-center gap-2 bg-gray-100 p-3 rounded-lg">
+                        <input type="range" id="brush-size" min="2" max="80" value="15" class="w-full">
+                        <div id="brush-preview" class="w-5 h-5 bg-black rounded-full transition-all"></div>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold mb-3 text-sky-700">5. ツール</h2>
+                    <div class="flex flex-col gap-3">
+                        <button id="animate-button" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 px-4 rounded-lg shadow transition">
+                            うごかす
+                        </button>
+                        <button id="reset-button" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg shadow transition">
+                            やりなおす
+                        </button>
+                        <button id="download-button" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg shadow transition">
+                            ほぞんする
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 塗り絵エリア -->
+            <main class="w-full lg:w-3/4 aspect-video bg-white rounded-2xl flex items-center justify-center p-0 border-4 border-sky-200 shadow-inner">
+                <div id="canvas-wrapper" class="w-full h-full">
+                    <!-- JSによってキャンバスとSVGがここに挿入されます -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvasWrapper = document.getElementById('canvas-wrapper');
+            const colorPalette = document.getElementById('color-palette');
+            const animalSelector = document.getElementById('animal-selector');
+            const resetButton = document.getElementById('reset-button');
+            const downloadButton = document.getElementById('download-button');
+            const animateButton = document.getElementById('animate-button');
+            const brushSizeSlider = document.getElementById('brush-size');
+            const brushPreview = document.getElementById('brush-preview');
+            const imageUpload = document.getElementById('image-upload');
+
+            let drawingCanvas, ctx, animalContainer, svgContainer;
+            let isDrawing = false, isAnimating = false;
+            let lastX = 0, lastY = 0;
+            let animationId = null;
+
+            let selectedColor = '#FFDDC1';
+            let currentAnimal = 'lion';
+            let brushSize = 15;
+            let animalState = {};
+            let customImage = null;
+
+            // 動物データを追加
+            const animals = {
+                lion: { name: 'ライオン', width: 150, height: 120, svg: `<svg viewBox="0 0 150 120" xmlns="http://www.w3.org/2000/svg"><g><path fill="transparent" stroke="black" stroke-width="2" d="M120,100 C140,80 130,50 110,50" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="75" cy="80" rx="50" ry="30" /><path fill="transparent" stroke="black" stroke-width="2" d="M40 105 C 30 115, 20 115, 25 100" /><path fill="transparent" stroke="black" stroke-width="2" d="M100 105 C 110 115, 120 115, 115 100" /><circle fill="transparent" stroke="black" stroke-width="2" cx="75" cy="45" r="35" /><circle fill="transparent" stroke="black" stroke-width="2" cx="75" cy="50" r="20" /><circle fill="black" cx="65" cy="45" r="3" /><circle fill="black" cx="85" cy="45" r="3" /><path d="M75 55 v 5" stroke="black" stroke-width="2" /></g></svg>` },
+                bear: { name: 'くま', width: 140, height: 140, svg: `<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg"><g><circle fill="transparent" stroke="black" stroke-width="2" cx="35" cy="35" r="20" /><circle fill="transparent" stroke="black" stroke-width="2" cx="105" cy="35" r="20" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="70" cy="90" rx="60" ry="40" /><circle fill="transparent" stroke="black" stroke-width="2" cx="70" cy="60" r="40" /><circle fill="transparent" stroke="black" stroke-width="2" cx="70" cy="70" r="15" /><circle fill="black" cx="55" cy="55" r="4" /><circle fill="black" cx="85" cy="55" r="4" /><path fill="transparent" stroke="black" stroke-width="2" d="M30 125 C 20 135, 10 135, 15 120" /><path fill="transparent" stroke="black" stroke-width="2" d="M110 125 C 120 135, 130 135, 125 120" /></g></svg>` },
+                rabbit: { name: 'うさぎ', width: 120, height: 150, svg: `<svg viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg"><g><path fill="transparent" stroke="black" stroke-width="2" d="M40,10 C30,40 40,70 50,70" /><path fill="transparent" stroke="black" stroke-width="2" d="M80,10 C90,40 80,70 70,70" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="60" cy="110" rx="40" ry="30" /><circle fill="transparent" stroke="black" stroke-width="2" cx="60" cy="80" r="30" /><circle fill="black" cx="50" cy="75" r="3" /><circle fill="black" cx="70" cy="75" r="3" /><path d="M60 85 l-3 3 l3 -3 l3 3" stroke="black" stroke-width="2" /><path fill="transparent" stroke="black" stroke-width="2" d="M40 135 C 30 145, 20 145, 25 130" /><path fill="transparent" stroke="black" stroke-width="2" d="M80 135 C 90 145, 100 145, 95 130" /></g></svg>` },
+                cat: { name: 'ねこ', width: 130, height: 130, svg: `<svg viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg"><g><path fill="transparent" stroke="black" stroke-width="2" d="M120,90 C140,70 110,40 100,60" /><path fill="transparent" stroke="black" stroke-width="2" d="M30,30 L50,10 L70,30" /><path fill="transparent" stroke="black" stroke-width="2" d="M60,90 C 40,110 20,100 30,80" /><path fill="transparent" stroke="black" stroke-width="2" d="M100,90 C 120,110 140,100 110,80" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="70" cy="80" rx="45" ry="30" /><circle fill="transparent" stroke="black" stroke-width="2" cx="65" cy="45" r="30" /><circle fill="black" cx="55" cy="40" r="3" /><circle fill="black" cx="75" cy="40" r="3" /><path d="M65 50 l-3 3 l3 -3 l3 3" stroke="black" stroke-width="2" /></g></svg>` },
+                elephant: { name: 'ぞう', width: 160, height: 120, svg: `<svg viewBox="0 0 160 120" xmlns="http://www.w3.org/2000/svg"><g><path fill="transparent" stroke="black" stroke-width="2" d="M20 50 C 0 30, 20 0, 40 20" /><path fill="transparent" stroke="black" stroke-width="2" d="M140 50 C 160 30, 140 0, 120 20" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="80" cy="80" rx="60" ry="35" /><circle fill="transparent" stroke="black" stroke-width="2" cx="80" cy="45" r="40" /><path fill="transparent" stroke="black" stroke-width="2" d="M80 85 C 60 120, 100 120, 80 85" /><circle fill="black" cx="65" cy="40" r="4" /><circle fill="black" cx="95" cy="40" r="4" /></g></svg>`},
+                giraffe: { name: 'きりん', width: 120, height: 180, svg: `<svg viewBox="0 0 120 180" xmlns="http://www.w3.org/2000/svg"><g><rect x="50" y="40" width="20" height="100" fill="transparent" stroke="black" stroke-width="2" /><ellipse cx="60" cy="140" rx="50" ry="30" fill="transparent" stroke="black" stroke-width="2" /><circle cx="60" cy="30" r="30" fill="transparent" stroke="black" stroke-width="2" /><circle cx="50" cy="10" r="5" fill="black" /><circle cx="70" cy="10" r="5" fill="black" /><circle fill="black" cx="50" cy="25" r="3" /><circle fill="black" cx="70" cy="25" r="3" /></g></svg>`}
+            };
+            
+            const colors = [
+                '#FFADAD', '#FFDDC1', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFFFFC',
+                '#d11141', '#00b159', '#00aedb', '#f37735', '#ffc425', '#a200ff', '#58595b', '#000000'
+            ];
+
+            function setupDisplay(animalData) {
+                if (isAnimating) toggleAnimation();
+                canvasWrapper.innerHTML = ''; 
+                customImage = null;
+
+                animalContainer = document.createElement('div');
+                animalContainer.id = 'animal-container';
+                
+                drawingCanvas = document.createElement('canvas');
+                drawingCanvas.id = 'drawing-canvas';
+                
+                animalContainer.appendChild(drawingCanvas);
+                canvasWrapper.appendChild(animalContainer);
+
+                const scale = Math.min(canvasWrapper.clientWidth / animalData.width, canvasWrapper.clientHeight / animalData.height) * 0.5;
+                const scaledWidth = animalData.width * scale;
+                const scaledHeight = animalData.height * scale;
+                
+                animalContainer.style.width = `${scaledWidth}px`;
+                animalContainer.style.height = `${scaledHeight}px`;
+
+                drawingCanvas.width = scaledWidth;
+                drawingCanvas.height = scaledHeight;
+                ctx = drawingCanvas.getContext('2d');
+
+                const canvasRect = canvasWrapper.getBoundingClientRect();
+                animalState = {
+                    x: canvasRect.width / 2 - scaledWidth / 2,
+                    y: canvasRect.height / 2 - scaledHeight / 2,
+                    vx: (Math.random() - 0.5) * 2 + 1,
+                    vy: (Math.random() - 0.5) * 2 + 1,
+                    width: scaledWidth,
+                    height: scaledHeight
+                };
+                
+                updateAnimalTransform();
+            }
+
+            function setupAnimal(animalName) {
+                currentAnimal = animalName;
+                const animalData = animals[animalName];
+                setupDisplay(animalData);
+                
+                svgContainer = document.createElement('div');
+                svgContainer.id = 'svg-container';
+                svgContainer.innerHTML = animalData.svg;
+                animalContainer.appendChild(svgContainer);
+                animalContainer.style.backgroundImage = '';
+
+                animalSelector.querySelectorAll('.animal-button').forEach(button => {
+                    button.classList.toggle('selected', button.dataset.animal === animalName);
+                });
+            }
+
+            function setupCustomImage(imageDataUrl) {
+                const img = new Image();
+                img.onload = () => {
+                    currentAnimal = 'custom';
+                    customImage = img;
+                    const animalData = { width: img.width, height: img.height };
+                    setupDisplay(animalData);
+                    animalContainer.style.backgroundImage = `url(${imageDataUrl})`;
+                    animalSelector.querySelectorAll('.animal-button').forEach(b => b.classList.remove('selected'));
+                };
+                img.src = imageDataUrl;
+            }
+
+            function getEventPosition(e) {
+                const rect = canvasWrapper.getBoundingClientRect();
+                if (e.touches && e.touches.length > 0) {
+                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                }
+                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            }
+
+            function startDrawing(e) {
+                e.preventDefault();
+                isDrawing = true;
+                const pos = getEventPosition(e);
+                const canvasX = pos.x - animalState.x;
+                const canvasY = pos.y - animalState.y;
+                [lastX, lastY] = [canvasX, canvasY];
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                ctx.strokeStyle = selectedColor;
+                ctx.lineWidth = brushSize;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                const pos = getEventPosition(e);
+                const canvasX = pos.x - animalState.x;
+                const canvasY = pos.y - animalState.y;
+
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);
+                ctx.lineTo(canvasX, canvasY);
+                ctx.stroke();
+                [lastX, lastY] = [canvasX, canvasY];
+            }
+
+            function stopDrawing() { isDrawing = false; }
+            function selectColor(color, element) {
+                selectedColor = color;
+                colorPalette.querySelectorAll('.color-box').forEach(box => box.classList.remove('selected'));
+                element.classList.add('selected');
+                updateBrushPreview();
+            }
+            function updateBrushSize(e) {
+                brushSize = e.target.value;
+                updateBrushPreview();
+            }
+            function updateBrushPreview() {
+                const previewSize = Math.max(2, Math.min(brushSize, 40));
+                brushPreview.style.width = `${previewSize}px`;
+                brushPreview.style.height = `${previewSize}px`;
+                brushPreview.style.backgroundColor = selectedColor;
+            }
+
+            function updateAnimalTransform() {
+                 if (!animalContainer) return;
+                 const angle = isAnimating ? Math.atan2(animalState.vy, animalState.vx) * (180 / Math.PI) : 0;
+                 animalContainer.style.transform = `translate(${animalState.x}px, ${animalState.y}px) rotate(${angle}deg)`;
+            }
+
+            function gameLoop() {
+                const canvasRect = canvasWrapper.getBoundingClientRect();
+                animalState.x += animalState.vx;
+                animalState.y += animalState.vy;
+                if (animalState.x <= 0 || animalState.x + animalState.width >= canvasRect.width) { animalState.vx *= -1; }
+                if (animalState.y <= 0 || animalState.y + animalState.height >= canvasRect.height) { animalState.vy *= -1; }
+                if (Math.random() < 0.01) {
+                    animalState.vx = (Math.random() - 0.5) * 3 + Math.sign(animalState.vx);
+                    animalState.vy = (Math.random() - 0.5) * 3 + Math.sign(animalState.vy);
+                }
+                updateAnimalTransform();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+            
+            function toggleAnimation() {
+                isAnimating = !isAnimating;
+                animateButton.textContent = isAnimating ? 'とめる' : 'うごかす';
+                animateButton.classList.toggle('bg-pink-500', !isAnimating);
+                animateButton.classList.toggle('bg-blue-500', isAnimating);
+                if (isAnimating) {
+                    gameLoop();
+                } else {
+                    cancelAnimationFrame(animationId);
+                    updateAnimalTransform(); // 角度をリセット
+                }
+            }
+            
+            function handleImageUpload(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => setupCustomImage(event.target.result);
+                reader.readAsDataURL(file);
+            }
+
+            // --- 初期化処理 ---
+            colors.forEach(color => {
+                const colorBox = document.createElement('div');
+                colorBox.className = 'color-box w-10 h-10 rounded-full cursor-pointer border-4 border-white shadow-md';
+                colorBox.style.backgroundColor = color;
+                if (color === selectedColor) colorBox.classList.add('selected');
+                colorBox.addEventListener('click', () => selectColor(color, colorBox));
+                colorPalette.appendChild(colorBox);
+            });
+            
+            Object.keys(animals).forEach(key => {
+                const button = document.createElement('button');
+                button.textContent = animals[key].name;
+                button.dataset.animal = key;
+                button.className = 'animal-button bg-sky-200 hover:bg-sky-300 text-sky-800 font-bold py-2 px-2 rounded-lg shadow transition';
+                button.addEventListener('click', () => setupAnimal(key));
+                animalSelector.appendChild(button);
+            });
+
+            // イベントリスナー
+            resetButton.addEventListener('click', () => {
+                ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            });
+            
+            animateButton.addEventListener('click', toggleAnimation);
+            
+            downloadButton.addEventListener('click', () => {
+                const wasAnimating = isAnimating;
+                if (wasAnimating) toggleAnimation();
+
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = animalState.width;
+                tempCanvas.height = animalState.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCtx.fillStyle = 'white';
+                tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                
+                if (currentAnimal === 'custom' && customImage) {
+                    tempCtx.drawImage(customImage, 0, 0, tempCanvas.width, tempCanvas.height);
+                    tempCtx.drawImage(drawingCanvas, 0, 0);
+                    const link = document.createElement('a');
+                    link.download = `my-oekaki.png`;
+                    link.href = tempCanvas.toDataURL('image/png');
+                    link.click();
+                    if (wasAnimating) toggleAnimation();
+                } else {
+                    tempCtx.drawImage(drawingCanvas, 0, 0);
+                    const svgString = new XMLSerializer().serializeToString(svgContainer.querySelector('svg'));
+                    const svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+                    const img = new Image();
+                    img.onload = () => {
+                        tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+                        const link = document.createElement('a');
+                        link.download = `${currentAnimal}-oekaki.png`;
+                        link.href = tempCanvas.toDataURL('image/png');
+                        link.click();
+                        if (wasAnimating) toggleAnimation();
+                    };
+                    img.src = svgUrl;
+                }
+            });
+            
+            brushSizeSlider.addEventListener('input', updateBrushSize);
+            imageUpload.addEventListener('change', handleImageUpload);
+            
+            canvasWrapper.addEventListener('mousedown', startDrawing);
+            canvasWrapper.addEventListener('mousemove', draw);
+            canvasWrapper.addEventListener('mouseup', stopDrawing);
+            canvasWrapper.addEventListener('mouseleave', stopDrawing);
+            canvasWrapper.addEventListener('touchstart', startDrawing, { passive: false });
+            canvasWrapper.addEventListener('touchmove', draw, { passive: false });
+            canvasWrapper.addEventListener('touchend', stopDrawing);
+            window.addEventListener('resize', () => {
+                if (currentAnimal === 'custom' && customImage) {
+                    setupCustomImage(customImage.src);
+                } else {
+                    setupAnimal(currentAnimal)
+                }
+            });
+
+            // 初期表示
+            setupAnimal(currentAnimal);
+            updateBrushPreview();
+        });
+    </script>
+</body>
+</html>
+
