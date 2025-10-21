@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Mochiy+Pop+One', sans-serif;
+            font-family: 'Mochiy Pop One', sans-serif;
         }
         .color-box {
             transition: transform 0.2s ease-in-out;
@@ -64,18 +64,37 @@
             height: 100%;
             object-fit: contain;
         }
+
+        /* --- 全画面表示用のスタイル (追加) --- */
+        .fullscreen-mode {
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            z-index: 50;
+            padding: 1rem !important; /* 余白を調整 */
+        }
+        .fullscreen-mode aside {
+            display: none; /* コントロールパネルを非表示 */
+        }
+        .fullscreen-mode main {
+            width: 100%;
+            height: 100%;
+            border: none !important; /* 枠線を非表示 */
+        }
     </style>
 </head>
 <body class="bg-sky-100 text-gray-800 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-4 md:p-8">
+    <div id="main-container" class="w-full max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-4 md:p-8">
         <header class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-sky-600">もっと！うごく！おえかき どうぶつ ぬりえ</h1>
             <p class="text-gray-500 mt-2">好きな動物や自分の絵に色を塗って動かしてみよう！</p>
         </header>
 
         <div class="flex flex-col lg:flex-row gap-8">
-            <!-- コントロールパネル -->
             <aside class="w-full lg:w-1/4 flex flex-col gap-6">
                 <div>
                     <h2 class="text-xl font-bold mb-3 text-sky-700">1. どうぶつをえらぶ</h2>
@@ -111,15 +130,16 @@
                         <button id="download-button" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg shadow transition">
                             ほぞんする
                         </button>
+                        <button id="fullscreen-button" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg shadow transition">
+                           全画面でおえかき
+                        </button>
                     </div>
                 </div>
             </aside>
 
-            <!-- 塗り絵エリア -->
             <main class="w-full lg:w-3/4 aspect-video bg-white rounded-2xl flex items-center justify-center p-0 border-4 border-sky-200 shadow-inner">
                 <div id="canvas-wrapper" class="w-full h-full">
-                    <!-- JSによってキャンバスとSVGがここに挿入されます -->
-                </div>
+                    </div>
             </main>
         </div>
     </div>
@@ -135,6 +155,9 @@
             const brushSizeSlider = document.getElementById('brush-size');
             const brushPreview = document.getElementById('brush-preview');
             const imageUpload = document.getElementById('image-upload');
+            // --- (追加) ---
+            const fullscreenButton = document.getElementById('fullscreen-button');
+            const mainContainer = document.getElementById('main-container');
 
             let drawingCanvas, ctx, animalContainer, svgContainer;
             let isDrawing = false, isAnimating = false;
@@ -146,8 +169,8 @@
             let brushSize = 15;
             let animalState = {};
             let customImage = null;
+            let preservedDrawing = null; // (追加) 画面リサイズ時に描画を保持
 
-            // 動物データを追加
             const animals = {
                 lion: { name: 'ライオン', width: 150, height: 120, svg: `<svg viewBox="0 0 150 120" xmlns="http://www.w3.org/2000/svg"><g><path fill="transparent" stroke="black" stroke-width="2" d="M120,100 C140,80 130,50 110,50" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="75" cy="80" rx="50" ry="30" /><path fill="transparent" stroke="black" stroke-width="2" d="M40 105 C 30 115, 20 115, 25 100" /><path fill="transparent" stroke="black" stroke-width="2" d="M100 105 C 110 115, 120 115, 115 100" /><circle fill="transparent" stroke="black" stroke-width="2" cx="75" cy="45" r="35" /><circle fill="transparent" stroke="black" stroke-width="2" cx="75" cy="50" r="20" /><circle fill="black" cx="65" cy="45" r="3" /><circle fill="black" cx="85" cy="45" r="3" /><path d="M75 55 v 5" stroke="black" stroke-width="2" /></g></svg>` },
                 bear: { name: 'くま', width: 140, height: 140, svg: `<svg viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg"><g><circle fill="transparent" stroke="black" stroke-width="2" cx="35" cy="35" r="20" /><circle fill="transparent" stroke="black" stroke-width="2" cx="105" cy="35" r="20" /><ellipse fill="transparent" stroke="black" stroke-width="2" cx="70" cy="90" rx="60" ry="40" /><circle fill="transparent" stroke="black" stroke-width="2" cx="70" cy="60" r="40" /><circle fill="transparent" stroke="black" stroke-width="2" cx="70" cy="70" r="15" /><circle fill="black" cx="55" cy="55" r="4" /><circle fill="black" cx="85" cy="55" r="4" /><path fill="transparent" stroke="black" stroke-width="2" d="M30 125 C 20 135, 10 135, 15 120" /><path fill="transparent" stroke="black" stroke-width="2" d="M110 125 C 120 135, 130 135, 125 120" /></g></svg>` },
@@ -165,7 +188,7 @@
             function setupDisplay(animalData) {
                 if (isAnimating) toggleAnimation();
                 canvasWrapper.innerHTML = ''; 
-                customImage = null;
+                if(!preservedDrawing) customImage = null; // Don't reset custom image during resize
 
                 animalContainer = document.createElement('div');
                 animalContainer.id = 'animal-container';
@@ -186,6 +209,16 @@
                 drawingCanvas.width = scaledWidth;
                 drawingCanvas.height = scaledHeight;
                 ctx = drawingCanvas.getContext('2d');
+                
+                // (変更) リサイズ時に描画を復元
+                if (preservedDrawing) {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0, drawingCanvas.width, drawingCanvas.height);
+                        preservedDrawing = null; // 復元後にクリア
+                    };
+                    img.src = preservedDrawing;
+                }
 
                 const canvasRect = canvasWrapper.getBoundingClientRect();
                 animalState = {
@@ -323,6 +356,30 @@
                 reader.onload = (event) => setupCustomImage(event.target.result);
                 reader.readAsDataURL(file);
             }
+            
+            // --- (追加) 全画面表示を切り替える関数 ---
+            function toggleFullscreen() {
+                if (!document.fullscreenElement) {
+                    mainContainer.requestFullscreen().catch(err => {
+                        alert(`全画面表示にできませんでした: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            }
+
+            // --- (追加) 画面サイズ変更時の処理 ---
+            function handleResize() {
+                if (!drawingCanvas) return;
+                // 現在の描画内容を保存
+                preservedDrawing = drawingCanvas.toDataURL();
+                // 表示を再セットアップ
+                if (currentAnimal === 'custom' && customImage) {
+                    setupCustomImage(customImage.src);
+                } else {
+                    setupAnimal(currentAnimal);
+                }
+            }
 
             // --- 初期化処理 ---
             colors.forEach(color => {
@@ -339,7 +396,11 @@
                 button.textContent = animals[key].name;
                 button.dataset.animal = key;
                 button.className = 'animal-button bg-sky-200 hover:bg-sky-300 text-sky-800 font-bold py-2 px-2 rounded-lg shadow transition';
-                button.addEventListener('click', () => setupAnimal(key));
+                button.addEventListener('click', () => {
+                    // (変更) 描画リセット前に保存しない
+                    preservedDrawing = null;
+                    setupAnimal(key);
+                });
                 animalSelector.appendChild(button);
             });
 
@@ -397,12 +458,18 @@
             canvasWrapper.addEventListener('touchstart', startDrawing, { passive: false });
             canvasWrapper.addEventListener('touchmove', draw, { passive: false });
             canvasWrapper.addEventListener('touchend', stopDrawing);
-            window.addEventListener('resize', () => {
-                if (currentAnimal === 'custom' && customImage) {
-                    setupCustomImage(customImage.src);
-                } else {
-                    setupAnimal(currentAnimal)
-                }
+
+            // (変更) windowのリサイズイベントリスナー
+            window.addEventListener('resize', handleResize);
+
+            // --- (追加) 全画面表示関連のイベントリスナー ---
+            fullscreenButton.addEventListener('click', toggleFullscreen);
+            document.addEventListener('fullscreenchange', () => {
+                const isFullscreen = !!document.fullscreenElement;
+                mainContainer.classList.toggle('fullscreen-mode', isFullscreen);
+                fullscreenButton.textContent = isFullscreen ? 'もどる' : '全画面でおえかき';
+                // 画面サイズの変更を検知してキャンバスを再描画
+                setTimeout(handleResize, 100);
             });
 
             // 初期表示
@@ -412,4 +479,3 @@
     </script>
 </body>
 </html>
-
